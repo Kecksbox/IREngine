@@ -1,0 +1,18 @@
+$gray-content-background: #F5F7F9;
+$mark-blue: #039BE5;
+$link-blue: #5086EC;
+
+$base-text: #6A6B6B;
+
+$font-stack: Roboto;
+
+body {
+  margin: 0;
+  background-color: $gray-content-background;
+  font-family: $font-stack;
+  color: $base-text;
+}
+
+a {
+  color: $link-blue;
+}

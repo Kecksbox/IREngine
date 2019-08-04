@@ -1,0 +1,60 @@
+$collection-gap: 15.2666666667px;
+$collectionCard-width: 251.891518519px;
+$card-border-radius: 8px !important;
+
+.collectionsContainer {
+    margin: 0 auto;
+    width: 3 * $collectionCard-width + 6 * $collection-gap;
+    position: relative;
+    top: -200.162962963px;
+}
+
+.headLine{
+    font-size: 23.7481481481px;
+    color: #FFFFFF;
+    font-weight: bold;
+    margin: 0 0 $collection-gap $collection-gap;
+}
+
+.collectionCard {
+    width: $collectionCard-width;
+    height: 176.643814815px;
+    border-radius: $card-border-radius;
+    display: inline-block;
+    margin: $collection-gap;
+}
+
+.MuiButtonBase-root.collectionCardActionArea {
+    width: 100% !important;
+    height: 100% !important;
+    border-radius: $card-border-radius;
+    text-align: center;
+}
+
+.addLable {
+    font-weight: bold;
+    color: #039BE5;
+    font-size: 12.7222222222px;
+}
+
+.MuiDivider-middle.collectionFromInfoDivider {
+    margin: 3 * $collection-gap $collection-gap;
+    background: rgba(0, 0, 0, 0.16);
+}
+
+.collectionName {
+    font-size: 14.4185185185px;
+    font-weight: bold;
+    position: absolute;
+    top: 15.6907407407px;
+    left: 13.2311111111px;
+}
+
+.collectionCode {
+    font-stretch: condensed;
+    font-size: 10.1777777778px;
+    color: rgba(0, 0, 0, 0.64);
+    position: absolute;
+    top: 44.442962963px;
+    left: 13.2311111111px;
+}
