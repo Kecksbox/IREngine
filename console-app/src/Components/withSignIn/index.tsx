@@ -8,6 +8,8 @@ function withSignIn(WrappedComponent: any) {
 
         async componentDidMount() {
             firebase.auth().onAuthStateChanged(() => {
+                console.log('loggin state changed');
+                console.log(firebase.auth().currentUser);
                 this.setState({});
             });
         }
