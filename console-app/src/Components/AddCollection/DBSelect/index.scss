@@ -2,18 +2,19 @@
     color: #039BE5;
 }
 
-.AddOptionGroup .PrivateSwitchBase-root-76 {
-    padding: 7.63333333333px;
+.AddOptionGroup .MuiIconButton-root {
+    padding: 7.63333333333px !important;
     margin-right: 18.7440740741px - 7.63333333333px;
 }
 
 .AddOptionGroup  .MuiFormControlLabel-root {
-    margin: 12.3405555556px 0px;
+    margin: (11.0683333333px - 0.84814814814px) 0px;
 }
 
 .AddOptionGroup .MuiTypography-body1 {
     font-size: 20.3555555556px;
     font-weight: normal;
+    line-height: 27.1407407407px;
 }
 
 .AddOptionGroup .MuiSvgIcon-fontSizeSmall {
@@ -22,6 +23,12 @@
 
 .RadioButtonSection {
     position: absolute !important;
+    left: 36.2159259259px - 7.63333333333px;
+    top: 159.621481481px - (11.0683333333px - 0.84814814814px);
+}
+
+.LearnMore {
+    position: absolute;
+    top: 307.538518519px;
     left: 36.2159259259px;
-    top: 161.317777778px;
 }

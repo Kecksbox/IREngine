@@ -4,6 +4,7 @@
     height: 517.005666667px;
     position: relative;
     top: -168.781481481px;
+    border-radius: 26px !important;
 }
 
 .addCollLable {
@@ -12,4 +13,32 @@
     position: relative;
     top: 44.6125925926px;
     left: 36.2159259259px;
+}
+
+.NextButton {
+    background: #039BE5 !important;
+    color: white !important;
+    width: 361.048185185px;
+    height: 40.0495555556px;
+    box-shadow: 0px 1px 5px 0px rgba(0,0,0,0.2), 0px 2px 2px 0px rgba(0,0,0,0.14), 0px 3px 1px -2px rgba(0,0,0,0.12);
+    position: absolute !important;
+    top: 411.775925926px;
+    left: 36.2159259259px;
+    text-transform: uppercase;
+}
+
+.NextButton .MuiButton-label {
+    font-size: 14.4185185185px;
+    font-weight: bold;
+}
+
+.BackLable {
+    text-decoration: none;
+    font-size: 16.1148148148px;
+    font-weight: 300;
+    line-height: 21.2037037037px;
+    position: absolute;
+    top: 473.521111111px;
+    left: 199.23px;
+    cursor: pointer;
 }

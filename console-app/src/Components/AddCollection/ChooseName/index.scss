@@ -1,0 +1,15 @@
+.NameField {
+    width: 360.488407407px;
+    height: 22.4759259259px;
+    position: absolute !important;
+    left: 36.64px;
+    top: 258.685185185px - 2 * 16px;
+}
+
+.NameField .Mui-focused {
+    color: #039BE5 !important;
+}
+
+.NameField .MuiInput-underline:after {
+    border-bottom-color: #039BE5;
+}
