@@ -2,11 +2,14 @@ import React from 'react';
 
 import './index.scss';
 
-import * as ROUTES from '../../../Constants/routes';
-import LearnMore from '../../LearnMore';
 import { TextField } from '@material-ui/core';
 
-class ChooseName extends React.Component<any, any> {
+interface ChooseNameProps {
+    name: string,
+    onChange: (event: any) => void,
+}
+
+class ChooseName extends React.Component<ChooseNameProps, any> {
 
     public render() {
         return (
@@ -16,7 +19,7 @@ class ChooseName extends React.Component<any, any> {
                     label="Name"
                     className="NameField"
                     value={this.props.name}
-                    onChange={this.props.handleNameChange}
+                    onChange={this.props.onChange}
                     margin="normal"
                 />
             </div>

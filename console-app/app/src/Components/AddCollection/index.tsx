@@ -1,5 +1,7 @@
 import React from 'react';
 
+import * as firebase from 'firebase';
+
 import { Card, Button } from '@material-ui/core';
 import DBSelect from './DBSelect';
 import ChooseName from './ChooseName';
@@ -22,6 +24,7 @@ interface AddCollectionStep {
 interface AddCollectionState {
     step: AddCollectionStep,
     selected: string,
+    name: string,
 }
 
 class AddCollection extends React.Component<any, AddCollectionState> {
@@ -29,6 +32,7 @@ class AddCollection extends React.Component<any, AddCollectionState> {
     state = {
         step: STEPS.DBSelect,
         selected: "local",
+        name: "",
     }
 
     public render() {
@@ -56,10 +60,17 @@ class AddCollection extends React.Component<any, AddCollectionState> {
     }
 
     private handleClickNext() {
-        if(this.state.step.id === 0) {
-            this.setState({
-                step: this.selectNextStepBasedOnSelection(),
-            });
+        switch(this.state.step.id) {
+            case 0:
+                this.setState({
+                    step: this.selectNextStepBasedOnSelection(),
+                });
+            break;
+            case 3:
+                this.createNewCollection();
+            break;
+            default:
+                    throw new EvalError("Unexpected state.");
         }
     }
 
@@ -67,10 +78,27 @@ class AddCollection extends React.Component<any, AddCollectionState> {
         console.log("back");
     }
 
-    private handleDBChange(event: React.ChangeEvent<unknown>) {
+    private renderCardContent(): React.ReactNode {
+        switch(this.state.step.id) {
+            case 0:
+                return <DBSelect selected={this.state.selected} onChange={this.handleDBChange.bind(this)} />
+            case 3:
+                return <ChooseName name={this.state.name} onChange={this.handleNameChange.bind(this)}/>;
+            default:
+                throw new EvalError("Unexpected state.");
+        }
+    }
+
+    private handleDBChange(event: React.ChangeEvent<HTMLInputElement>) {
         this.setState({
-            selected: (event.target as HTMLInputElement).value,
+            selected: event.target.value,
         });
+    }
+
+    private handleNameChange(event: React.ChangeEvent<HTMLInputElement>) {
+        this.setState({
+            name: event.target.value,
+        })
     }
 
     private selectNextStepBasedOnSelection() {
@@ -86,15 +114,12 @@ class AddCollection extends React.Component<any, AddCollectionState> {
         }
     }
 
-    private renderCardContent(): React.ReactNode {
-        switch(this.state.step.id) {
-            case 0:
-                return <DBSelect selected={this.state.selected} handleDBChange={this.handleDBChange.bind(this)} />
-            case 3:
-                return <ChooseName />;
-            default:
-                throw new EvalError("Unexpected state.");
-        }
+    private createNewCollection() {
+        const createCollectionCloudFunction = firebase.functions().httpsCallable('createNewCollection');
+        createCollectionCloudFunction(this.state).then(result => {
+            console.log(result);
+            console.log('success. Back to home Screen or to collection home screen');
+        })
     }
 
 }
