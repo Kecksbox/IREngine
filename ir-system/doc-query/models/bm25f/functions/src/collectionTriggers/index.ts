@@ -1,3 +1,60 @@
+export async function deleteCallback(snap: FirebaseFirestore.DocumentSnapshot, context: functions.EventContext) {
+    return await deleteIndexForDocument(snap, context);
+}
+
+async function deleteIndexForDocument(snap: FirebaseFirestore.DocumentSnapshot, context: functions.EventContext) {
+    initCache(snap, context);
+    await deleteFromCollIndex();
+    await deleteFromDocIndex();
+    await deleteFromHitBin();
+    await deleteFromLexicon();
+}
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
 import * as functions from 'firebase-functions';
 import * as rpn from 'request-promise-native';
 
@@ -66,14 +123,8 @@ interface Cache {
     hitBin?: Changelog<Document<Hit>>[],
 }
 
-let cache: Cache;
-
 export async function createCallback(snap: FirebaseFirestore.DocumentSnapshot, context: functions.EventContext) {
     return await createNewIndexForDocument(snap, context);
-}
-
-export async function deleteCallback(snap: FirebaseFirestore.DocumentSnapshot, context: functions.EventContext) {
-    return await deleteIndexForDocument(snap, context);
 }
 
 function initCache(snap: FirebaseFirestore.DocumentSnapshot, context: functions.EventContext) {
@@ -132,14 +183,6 @@ async function createNewIndexForDocument(snap: FirebaseFirestore.DocumentSnapsho
     console.log('done');
 }
 
-async function deleteIndexForDocument(snap: FirebaseFirestore.DocumentSnapshot, context: functions.EventContext) {
-    initCache(snap, context);
-    await deleteFromCollIndex();
-    await deleteFromDocIndex();
-    await deleteFromHitBin();
-    await deleteFromLexicon();
-}
-
 async function deleteFromHitBin() {
     if (cache.newDocumentData === undefined) {
         throw new functions.https.HttpsError('invalid-argument', '...');
@@ -181,7 +224,7 @@ async function deleteFromLexicon() {
         // write updated version to cache
         cache.seenLemmaDict[lexicalEntry.id] = {
             operation: 'set',
-            
+
         }
     }
 
