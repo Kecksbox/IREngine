@@ -1,0 +1,497 @@
+import * as functions from 'firebase-functions';
+import * as rpn from 'request-promise-native';
+
+import { db } from '..';
+import { isArray } from 'util';
+
+interface Token {
+    text: string,
+    lemma: string,
+    pos: string,
+    tag: string,
+    dep: string,
+    stop: boolean,
+    punc: boolean
+    children: string[],
+}
+
+interface Hit extends Token {
+    document: FirebaseFirestore.DocumentReference,
+    property: string,
+}
+
+interface SeenLemmaDict {
+    [key: string]: Changelog<Document<LexicalEntry>>;
+}
+
+interface Document<T> {
+    ref: FirebaseFirestore.DocumentReference,
+    data: T,
+}
+
+interface CollIndexEntry {
+    name: string,
+    docCount: number,
+    avgLength: number,
+    propWeightDict: object,
+}
+
+interface ParticipatingDocOverview {
+    [key: string]: boolean,
+}
+
+interface LexicalEntry {
+    idf: number,
+    docCount: number,
+    docsContainingLemma: ParticipatingDocOverview,
+}
+
+interface Changelog<T> {
+    element: T,
+    operation: 'set' | 'delete',
+}
+
+interface DocIndexEntry {
+    status: number,
+    docLength: number,
+}
+
+interface Cache {
+    collID?: string,
+    docID?: string,
+    newDocumentData?: Document<FirebaseFirestore.DocumentData>,
+    collIndexEntry?: Changelog<Document<CollIndexEntry>>,
+    docIndexEntry?: Changelog<Document<DocIndexEntry>>,
+    seenLemmaDict?: SeenLemmaDict,
+    hitBin?: Changelog<Document<Hit>>[],
+}
+
+let cache: Cache;
+
+export async function createCallback(snap: FirebaseFirestore.DocumentSnapshot, context: functions.EventContext) {
+    return await createNewIndexForDocument(snap, context);
+}
+
+export async function deleteCallback(snap: FirebaseFirestore.DocumentSnapshot, context: functions.EventContext) {
+    return await deleteIndexForDocument(snap, context);
+}
+
+function initCache(snap: FirebaseFirestore.DocumentSnapshot, context: functions.EventContext) {
+    // create an empty cache
+    cache = {};
+
+    // get the callbacks parameters
+    cache.collID = context.params.collID;
+    cache.docID = context.params.docID;
+
+    // get the documents data
+    cache.newDocumentData = {
+        ref: snap.ref,
+        data: snap.data() as FirebaseFirestore.DocumentData,
+    }
+
+    // validate new Document
+    if (!isValidDocument(cache.newDocumentData.data)) {
+        throw new functions.https.HttpsError('invalid-argument', '...');
+    }
+
+    console.log(cache.newDocumentData.data);
+}
+
+async function createNewIndexForDocument(snap: FirebaseFirestore.DocumentSnapshot, context: functions.EventContext) {
+
+    initCache(snap, context);
+
+    if (cache.newDocumentData === undefined) {
+        throw new functions.https.HttpsError('invalid-argument', '...');
+    }
+
+    // get the collIndexEntry to count up the global document Count
+    const collIndexEntry = await getCollIndexEntry();
+    collIndexEntry.element.data.docCount += 1;
+    // get the propWeightDict to update it while counting hits
+    const propWeightDict = collIndexEntry.element.data.propWeightDict;
+    // For each property field count the hits and add previously unseen properties to the propWeightDict
+    const countHitPromises: Array<Promise<any>> = [];
+    // we keep track of all idf scores we have allready updated to make sure not to update more often than needed
+    cache.seenLemmaDict = {};
+    // init empty hitBin
+    cache.hitBin = [];
+    // while counting the hits we also calculate the docsLength
+    countHitsInObjectRecursiv(
+        cache.newDocumentData.data,
+        propWeightDict,
+        countHitPromises
+    );
+    // wait for all hit count tasks to finish
+    await Promise.all(countHitPromises);
+    // update the collections averageLength
+    collIndexEntry.element.data.avgLength = (collIndexEntry.element.data.avgLength * (collIndexEntry.element.data.docCount - 1) + (await getDocIndexEntry()).element.data.docLength) / collIndexEntry.element.data.docCount;
+    // update the database
+    await persistCache();
+    console.log('done');
+}
+
+async function deleteIndexForDocument(snap: FirebaseFirestore.DocumentSnapshot, context: functions.EventContext) {
+    initCache(snap, context);
+    await deleteFromCollIndex();
+    await deleteFromDocIndex();
+    await deleteFromHitBin();
+    await deleteFromLexicon();
+}
+
+async function deleteFromHitBin() {
+    if (cache.newDocumentData === undefined) {
+        throw new functions.https.HttpsError('invalid-argument', '...');
+    }
+    // load in all hits for this document
+    const hitBinRef = getHitBinRef();
+    const hitBinDocs = await (hitBinRef.where('document', '==', cache.newDocumentData.ref)).get();
+    // validate hits
+    validateHits(hitBinDocs);
+    // add to local cache
+    if (cache.hitBin === undefined) {
+        throw new functions.https.HttpsError('invalid-argument', '...');
+    }
+    for (const hitDoc of hitBinDocs.docs) {
+        // add to cache
+        cache.hitBin.push({
+            operation: 'delete',
+            element: {
+                ref: hitDoc.ref,
+                data: hitDoc.data() as Hit,
+            }
+        });
+    }
+}
+
+async function deleteFromLexicon() {
+    if (cache.newDocumentData === undefined || cache.seenLemmaDict === undefined) {
+        throw new functions.https.HttpsError('invalid-argument', '...');
+    }
+    // load in all lexica entrys for this document
+    const lexicalEntrysForDocument = await (getLexiconRef().where(`docsContainingLemma.${String(cache.newDocumentData.ref)}`, '==', true)).get();
+    for (const lexicalEntry of lexicalEntrysForDocument.docs) {
+        // get data
+        const lexicalEntryData = lexicalEntry.data() as LexicalEntry;
+        // validate lexical Entry
+        if (!isValidLexicalEntry(lexicalEntryData)) {
+            throw new functions.https.HttpsError('invalid-argument', '...');
+        }
+        // write updated version to cache
+        cache.seenLemmaDict[lexicalEntry.id] = {
+            operation: 'set',
+            
+        }
+    }
+
+}
+
+async function deleteHitFromLexicon(hit: Changelog<Document<Hit>>) {
+    // Load in Lexicon by document
+    
+}
+
+function validateHits(hits: FirebaseFirestore.QuerySnapshot) {
+    return true;
+}
+
+function getHitBinRef() {
+    if (cache.collID === undefined) {
+        throw new functions.https.HttpsError('invalid-argument', '...');
+    }
+    return db.collection('collectionIndex').doc(cache.collID).collection('hitBin');
+}
+
+async function deleteFromCollIndex() {
+    // get the collIndexEntry for this collection
+    const collIndexEntry = await getCollIndexEntry();
+    // get the documentIndexEntry for this document (for length)
+    const docIndexEntry = await getDocIndexEntry();
+    collIndexEntry.element.data.avgLength = (collIndexEntry.element.data.avgLength * collIndexEntry.element.data.docCount - docIndexEntry.element.data.docLength) / (collIndexEntry.element.data.docCount - 1);
+    collIndexEntry.element.data.docCount -= 1;
+}
+
+async function deleteFromDocIndex() {
+    // get the docIndex
+    const docIndexEntry = await getDocIndexEntry();
+    // delete Document
+    docIndexEntry.operation = 'delete';
+}
+
+async function persistCache() {
+    if (cache.collIndexEntry === undefined) {
+        throw new functions.https.HttpsError('invalid-argument', '...');
+    }
+    await persistDocument(cache.collIndexEntry);
+    if (cache.docIndexEntry === undefined) {
+        throw new functions.https.HttpsError('invalid-argument', '...');
+    }
+    await persistDocument(cache.docIndexEntry);
+    if (cache.seenLemmaDict === undefined) {
+        throw new functions.https.HttpsError('invalid-argument', '...');
+    }
+    await persistSeenLemmaDict(cache.seenLemmaDict);
+    if (cache.hitBin === undefined) {
+        throw new functions.https.HttpsError('invalid-argument', '...');
+    }
+    await persistHitBin(cache.hitBin);
+}
+
+async function persistDocument(doc: Changelog<Document<any>>) {
+    if (doc.operation === 'delete') {
+        await doc.element.ref.delete();
+    } else {
+        await doc.element.ref.set(doc.element.data);
+    }
+}
+
+async function persistSeenLemmaDict(seenLemmaDict: SeenLemmaDict) {
+    for (const lemma in seenLemmaDict) {
+        if (!seenLemmaDict.hasOwnProperty(lemma)) {
+            throw new functions.https.HttpsError('invalid-argument', '...');
+        }
+        const localLemmaEntry = seenLemmaDict[lemma];
+        await persistDocument(localLemmaEntry);
+    }
+}
+
+async function persistHitBin(hitBin: Changelog<Document<Hit>>[]) {
+    for (const hit of hitBin) {
+        persistDocument(hit);
+    }
+}
+
+// TO-DO: replace by real check.
+function isValidDocument(doc: FirebaseFirestore.DocumentData | undefined) {
+    return doc !== undefined;
+}
+
+async function getCollIndexEntry() {
+    if (!cache.collIndexEntry) {
+        if (cache.collID === undefined) {
+            throw new functions.https.HttpsError('invalid-argument', '...');
+        }
+        const collIndexRef = db.collection('collectionIndex').doc(cache.collID);
+        const collIndexDoc = await collIndexRef.get();
+        if (!collIndexDoc.exists) {
+            throw new functions.https.HttpsError('invalid-argument', '...');
+        }
+        const collIndexDocData = collIndexDoc.data();
+        // check if data is valid collIndexEntry
+        validateCollIndexEntry(collIndexDocData);
+        cache.collIndexEntry = {
+            operation: 'set',
+            element: {
+                ref: collIndexRef,
+                data: collIndexDocData,
+            },
+        } as Changelog<Document<CollIndexEntry>>;
+    }
+    return cache.collIndexEntry;
+}
+
+async function getDocIndexEntry() {
+    if (!cache.docIndexEntry) {
+        if (cache.collID === undefined || cache.docID === undefined) {
+            throw new functions.https.HttpsError('invalid-argument', '...');
+        }
+        const docIndexEntryRef = db.collection('collectionIndex').doc(cache.collID).collection('docIndex').doc(cache.docID);
+        const docIndexEntry = await docIndexEntryRef.get();
+        let data = {
+            status: 0,
+            docLength: 0,
+        };
+        if (docIndexEntry.exists) {
+            data = docIndexEntry.data() as DocIndexEntry;
+            validateDocIndexEntryData(data);
+        }
+        cache.docIndexEntry = {
+            operation: 'set',
+            element: {
+                ref: docIndexEntryRef,
+                data,
+            },
+        }
+    }
+    return cache.docIndexEntry;
+}
+
+function validateDocIndexEntryData(data: any) {
+    return true;
+}
+
+function countHitsInObjectRecursiv(obj: any, propWeightDict: any, countHitPromises: Array<Promise<any>>, deepKey: string = "") {
+    for (const key in obj) {
+        if (obj.hasOwnProperty(key)) {
+            // update deepKey
+            const localDeepKey = deepKey.length === 0 ? key : deepKey + "." + key;
+            // check if value is an object
+            if (isObject(obj[key])) {
+                console.log('if');
+                console.log(propWeightDict);
+                // Add the key to the weightDict if not existent
+                if (!propWeightDict.hasOwnProperty(key)) {
+                    propWeightDict[key] = {};
+                }
+                // count Hits recursive
+                countHitsInObjectRecursiv(obj[key], propWeightDict[key], countHitPromises, localDeepKey);
+            } else {
+                // transform the value to a string
+                const value = String(obj[key]);
+                // Add the default weight to the property if not existent
+                console.log('else');
+                console.log(propWeightDict);
+                if (!propWeightDict.hasOwnProperty(key)) {
+                    propWeightDict[key] = 1;
+                }
+                // count hits in the text
+                const countHitPromise = countHitsInText(value, propWeightDict[key], localDeepKey);
+                countHitPromises.push(countHitPromise);
+            }
+        }
+    }
+}
+
+async function countHitsInText(text: string, weight: number, deepKey: string) {
+    if (cache.hitBin === undefined || cache.newDocumentData === undefined || cache.collID === undefined) {
+        throw new functions.https.HttpsError('invalid-argument', '...');
+    }
+    // parse text to nlp parser
+    const tokens = await semanticParse(text);
+    // get hitBinRef
+    const hitBinRef = getHitBinRef();
+    // for each of these tokens
+    for (const token of tokens) {
+        // skip tokens that are puctuation tokens
+        if (token.punc) {
+            continue;
+        }
+        // update lexica entry for the token
+        await updateLexicaEntryForToken(token.lemma);
+        // extend token to a hit by adding prop information and document
+        (token as any).property = deepKey;
+        (token as any).document = cache.newDocumentData.ref;
+        // add hit to HitBin
+        cache.hitBin.push({
+            element: {
+                ref: hitBinRef.doc(),
+                data: token,
+            },
+            operation: 'set',
+        } as Changelog<Document<Hit>>);
+        // add to docLength (for the docLength we count every hit as a full match)
+        (await getDocIndexEntry()).element.data.docLength += weight;
+    }
+}
+
+async function semanticParse(text: string) {
+    try {
+        const result = await rpn({
+            method: 'POST',
+            uri: 'https://us-central1-irengine-fd40f.cloudfunctions.net/semanticParsing',
+            body: {
+                text,
+            },
+            json: true,
+        });
+        console.log(result.tokens);
+        // validate result
+        isValidResult(result.tokens);
+        return result.tokens as Token[];
+    } catch (err) {
+        console.log(err);
+        throw new functions.https.HttpsError('invalid-argument', '...');
+    }
+}
+
+async function updateLexicaEntryForToken(tokenLemma: string) {
+    if (cache.seenLemmaDict === undefined || cache.newDocumentData === undefined) {
+        throw new functions.https.HttpsError('invalid-argument', '...');
+    }
+    // skip if lexical entry was allready updated during this callBack
+    if (cache.seenLemmaDict[tokenLemma]) {
+        return;
+    }
+    // get the lexical entry for the tokenLemma
+    cache.seenLemmaDict[tokenLemma] = await getTokenLemmaEntry(tokenLemma);
+
+    const entryData = cache.seenLemmaDict[tokenLemma].element.data;
+    // update idf and doclist
+    entryData.docsContainingLemma[String(cache.newDocumentData.ref)] = true;
+    entryData.idf = Math.log(1 + ((await getCollIndexEntry()).element.data.docCount - entryData.docCount + 0.5) / (entryData.docCount + 0.5));
+}
+
+function getLexiconRef() {
+    if (cache.collID === undefined) {
+        throw new functions.https.HttpsError('invalid-argument', '...');
+    }
+    return db.collection('collectionIndex').doc(cache.collID).collection('lexicon');
+}
+
+async function getTokenLemmaEntry(tokenLemma: string): Promise<Changelog<Document<LexicalEntry>>> {
+    // init tokenEntry with starting values
+    let entryData: LexicalEntry = {
+        idf: 0,
+        docCount: 0,
+        docsContainingLemma: {},
+    }
+    // make sure token entry exists
+    const tokenEntryRef = getLexiconRef().doc(tokenLemma);
+    const tokenEntry = await tokenEntryRef.get();
+    if (tokenEntry.exists) {
+        // make sure it is a valid lexiconEntry
+        entryData = tokenEntry.data() as LexicalEntry;
+        isValidLexicalEntry(entryData)
+    }
+    return {
+        element: {
+            ref: tokenEntryRef,
+            data: entryData,
+        },
+        operation: 'set',
+    }
+}
+
+function isObject(element: any) {
+    return (!!element) && (element.constructor === Object);
+}
+
+function isValidLexicalEntry(entry: FirebaseFirestore.DocumentData | undefined): entry is LexicalEntry {
+    if (entry === undefined) {
+        throw new functions.https.HttpsError('invalid-argument', '...');
+    }
+    return true;
+}
+
+function isValidToken(token: any): token is Token {
+    return true;
+}
+
+function isValidResult(result: any): result is Token[] {
+    if (isArray(result) === false) {
+        throw new functions.https.HttpsError('invalid-argument', '...');
+    }
+    // check for entry if it is a token
+    for (const token of result) {
+        if (!isValidToken(token)) {
+            throw new functions.https.HttpsError('invalid-argument', '...');
+        }
+    }
+    return true;
+}
+
+function validateCollIndexEntry(data: any) {
+    // ...
+    if (!data.hasOwnProperty('docCount')) {
+        data.docCount = 0;
+    }
+    if (!data.hasOwnProperty('avgLength')) {
+        data.avgLength = 0;
+    }
+    if (!data.hasOwnProperty('propWeightDict')) {
+        data.propWeightDict = {};
+    }
+    // ...
+    return true;
+}
