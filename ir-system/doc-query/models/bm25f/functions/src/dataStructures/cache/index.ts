@@ -1,5 +1,6 @@
 import * as functions from 'firebase-functions';
-import { db } from '../..';
+import { PropertyWeightDictonary } from '../../dataTypes/collectionIndexEntry';
+import { SeenLemmaOverview } from '../../dataTypes/lexicalEntry';
 
 class Cache {
 
@@ -13,12 +14,21 @@ class Cache {
         return this.loadProperty('triggerDocumentSnapshot');
     }
 
-    public static getCollectionIndexEntryRef(): FirebaseFirestore.DocumentReference {
-        return db.collection('collectionIndex').doc(Cache.getContext().params.collId);
+    public static getLocalPropertyWeightDictonary(): PropertyWeightDictonary {
+        return this.saveLoadProperty('localPropertyWeightDictonary', {});
     }
 
-    public static getDocumentIndexEntryRef(): FirebaseFirestore.DocumentReference {
-        return this.getCollectionIndexEntryRef().collection('documentIndex').doc(this.getContext().params.docId);
+    public static getSeenLemmaOverview(): SeenLemmaOverview {
+        return this.saveLoadProperty('seenLemmaOverview', {});
+    }
+
+    public static setDocumentLength(newLength: number) {
+        this.getDocumentLength();
+        (this.getInstance() as any)['documentLength'] = newLength;
+    }
+
+    public static getDocumentLength(): number {
+        return this.saveLoadProperty('documentLength', 0);
     }
 
     public static refresh(snap: FirebaseFirestore.DocumentSnapshot, context: functions.EventContext) {
@@ -38,6 +48,14 @@ class Cache {
             throw new functions.https.HttpsError('internal', `The property ${propertyName} you want to load has not yet been defined.`);
         }
         return (instance as any)[propertyName];
+    }
+
+    public static saveLoadProperty(propertyName: string, defaultValue: any) {
+        const instance = this.getInstance();
+        if (!(instance as any)[propertyName]) {
+            (instance as any)[propertyName] = defaultValue;
+        }
+        return this.loadProperty(propertyName);
     }
 
     private static getInstance() {

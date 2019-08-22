@@ -13,11 +13,13 @@ def semanticParsing(request):
         result.append({
             "text": token.text, 
             "lemma": token.lemma_,
-            "pos": token.pos_,
-            "tag": token.tag_,
-            "dep": token.dep_,
-            "stop": token.is_stop,
-            "punc": token.is_punct,
-            "children": [child.lemma_ for child in token.children],
+            "sematicProperties": {
+                "pos": token.pos_,
+                "tag": token.tag_,
+                "dep": token.dep_,
+                "stop": token.is_stop,
+                "punc": token.is_punct,
+                "children": [child.lemma_ for child in token.children],
+            },
         })
-    return jsonify(tokens = result)
+    return jsonify(result)

@@ -4,9 +4,7 @@ import Cache from "../dataStructures/cache";
 
 class Trigger {
 
-    public constructor(private callBack: () => void) {
-
-    }
+    public constructor(private callBack: () => void) {}
 
     public call(snap: FirebaseFirestore.DocumentSnapshot, context: functions.EventContext) {
         Cache.refresh(snap, context);
