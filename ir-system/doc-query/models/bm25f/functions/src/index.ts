@@ -1,6 +1,5 @@
 import * as functions from 'firebase-functions';
 import * as admin from 'firebase-admin';
-import { createCallback } from './collectionTriggers';
 
 admin.initializeApp(functions.config().firebase);
 
