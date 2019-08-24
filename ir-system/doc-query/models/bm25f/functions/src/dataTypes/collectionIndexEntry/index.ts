@@ -2,7 +2,7 @@ import * as functions from 'firebase-functions';
 import { db } from "../..";
 
 import Cache from "../../dataStructures/cache";
-import { isDocumentIndexEntry, getDocumentIndexEntryReference } from "../documentIndexEntry";
+import { isDocumentIndexEntry, getDocumentIndexEntryReference, DocumentIndexEntry } from "../documentIndexEntry";
 
 export interface PropertyWeightDictonary {
     [key: string]: PropertyWeightDictonary | number,
@@ -28,6 +28,38 @@ export function getCollectionIndexEntryReference(): FirebaseFirestore.DocumentRe
 }
 
 export async function removeFromCollectionIndexEntry() {
+    CollectionIndexEntryTransaction(
+        removeFromCollectionIndexEntryOperation,
+    );
+}
+
+export async function addDocumentToCollectionIndex() {
+    CollectionIndexEntryTransaction(
+        addDocumentToCollectionIndexOperation,
+    );  
+}
+
+function removeFromCollectionIndexEntryOperation(transaction: FirebaseFirestore.Transaction, collectionIndexEntryData: CollectionIndexEntry, documentIndexEntryData: DocumentIndexEntry) {
+    transaction.update(
+        getCollectionIndexEntryReference(),
+        {
+            docCount: collectionIndexEntryData.documentCount - 1,
+            avgLength: ((collectionIndexEntryData.averageLength * collectionIndexEntryData.documentCount) - documentIndexEntryData.length) / (collectionIndexEntryData.documentCount - 1)
+        }
+    );
+}
+
+function addDocumentToCollectionIndexOperation(transaction: FirebaseFirestore.Transaction, collectionIndexEntryData: CollectionIndexEntry, documentIndexEntryData: DocumentIndexEntry) {
+    transaction.update(
+        getCollectionIndexEntryReference(),
+        {
+            docCount: collectionIndexEntryData.documentCount + 1,
+            avgLength: ((collectionIndexEntryData.averageLength * collectionIndexEntryData.documentCount) + documentIndexEntryData.length) / (collectionIndexEntryData.documentCount + 1)
+        }
+    );
+}
+
+async function CollectionIndexEntryTransaction(operation: (transaction: FirebaseFirestore.Transaction, collectionIndexEntryData: CollectionIndexEntry, documentIndexEntryData: DocumentIndexEntry) => void) {
     db.runTransaction(async transaction => {
         return Promise.all([transaction.get(getCollectionIndexEntryReference()), transaction.get(getDocumentIndexEntryReference())]).then(docs => {
             const collectionIndexEntry = docs[0];
@@ -37,19 +69,13 @@ export async function removeFromCollectionIndexEntry() {
             if (isCollectionIndexEntry(collectionIndexEntryData)) {
                 const documentIndexEntryData = documentIndexEntry.data();
                 if (isDocumentIndexEntry(documentIndexEntryData)) {
-                    transaction.update(
-                        collectionIndexEntry.ref, 
-                        { 
-                            docCount: collectionIndexEntryData.documentCount - 1,
-                            avgLength: ((collectionIndexEntryData.averageLength * collectionIndexEntryData.documentCount) - documentIndexEntryData.length) / (collectionIndexEntryData.documentCount - 1)
-                        }
-                    );
+                    operation(transaction, collectionIndexEntryData, documentIndexEntryData);
                 } else {
                     throw new functions.https.HttpsError('internal', '...');
                 }
             } else {
                 throw new functions.https.HttpsError('internal', '...');
-            }   
+            }
         });
     });
 }

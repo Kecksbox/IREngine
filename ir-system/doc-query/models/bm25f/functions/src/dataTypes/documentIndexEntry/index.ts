@@ -1,7 +1,7 @@
 import Cache from "../../dataStructures/cache";
 import { getCollectionIndexEntryReference } from "../collectionIndexEntry";
 
-interface DocumentIndexEntry {
+export interface DocumentIndexEntry {
     status: number,
     length: number,
 }
@@ -16,4 +16,11 @@ export function getDocumentIndexEntryReference(): FirebaseFirestore.DocumentRefe
 
 export async function deleteDocumentIndexEntry() {
     await getDocumentIndexEntryReference().delete();
+}
+
+export async function addDocumentToDocumentIndex() {
+    await getDocumentIndexEntryReference().create({
+        status: 0,
+        length: Cache.getDocumentLength(),
+    });
 }
