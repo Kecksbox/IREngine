@@ -25,6 +25,7 @@ export function isValidToken(candidate: any): candidate is Token {
 export class SemanticParser {
 
     public static async parse(text: string) {
+        console.log('reached parser with text:', text);
         try {
             const result = await rpn({
                 method: 'POST',
@@ -34,13 +35,14 @@ export class SemanticParser {
                 },
                 json: true,
             });
+            console.log('returned something');
             if (this.isValidResult(result)) {
                 return result;
             } else {
-                throw new functions.https.HttpsError('internal', '...');
+                throw new functions.https.HttpsError('internal', 'invalid result');
             }
         } catch (err) {
-            throw new functions.https.HttpsError('internal', '...');
+            throw new functions.https.HttpsError('internal', 'failed to parse');
         }
     }
 

@@ -2,5 +2,5 @@ import Trigger from "..";
 import deleteAction from "../../actions/deleteAction";
 
 export default new Trigger(
-    () => deleteAction()
+    async () => deleteAction()
 );

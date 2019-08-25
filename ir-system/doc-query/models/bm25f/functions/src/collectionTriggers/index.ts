@@ -4,11 +4,13 @@ import Cache from "../dataStructures/cache";
 
 class Trigger {
 
-    public constructor(private callBack: () => void) {}
+    public constructor(private callBack: () => Promise<void>) {
+        this.call = this.call.bind(this);
+    }
 
-    public call(snap: FirebaseFirestore.DocumentSnapshot, context: functions.EventContext) {
+    public async call(snap: FirebaseFirestore.DocumentSnapshot, context: functions.EventContext) {
         Cache.refresh(snap, context);
-        this.callBack();
+        await this.callBack();
     }
 
 }

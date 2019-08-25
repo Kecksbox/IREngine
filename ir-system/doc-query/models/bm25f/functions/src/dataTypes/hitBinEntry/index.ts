@@ -18,14 +18,19 @@ export function getHitBinReference(): FirebaseFirestore.CollectionReference {
     return getCollectionIndexEntryReference().collection('hitBin');
 }
 
-export async function countHits() {
+export async function countHits(propertyWeightDictonary: PropertyWeightDictonary) {
     const countHitPromises: Array<Promise<any>> = [];
     countHitsInObjectRecursiv(
         Cache.getTriggerDocumentSnapshot().data(),
-        Cache.getLocalPropertyWeightDictonary(),
+        propertyWeightDictonary,
         countHitPromises,
     );
     await Promise.all(countHitPromises);
+}
+
+export async function removeAllHitsAssociatedWithTheDocumentToBeDeleted() {
+    const relevantDocuments = await getHitBinReference().where('documentId', '==', Cache.getTriggerDocumentSnapshot().id).get();
+    relevantDocuments.forEach(async snap => snap.ref.delete());
 }
 
 function countHitsInObjectRecursiv(obj: any, propertyWeightDictonary: PropertyWeightDictonary, countHitPromises: Array<Promise<any>>, deepKey: string = "") {
@@ -49,6 +54,7 @@ function countHitsInObjectRecursiv(obj: any, propertyWeightDictonary: PropertyWe
                 }
                 const propertyWeight = propertyWeightDictonary[key];
                 if (isNumber(propertyWeight)) {
+                    console.log('start counting:', value);
                     const countHitPromise = countHitsInText(value, propertyWeight, localDeepKey);
                     countHitPromises.push(countHitPromise);
                 } else {
@@ -78,9 +84,4 @@ async function countHitsInText(text: string, weight: number, deepKey: string) {
 
         Cache.setDocumentLength(Cache.getDocumentLength() + weight);
     }
-}
-
-export async function removeAllHitsAssociatedWithTheDocumentToBeDeleted() {
-    const relevantDocuments = await getHitBinReference().where('documentId', '==', Cache.getTriggerDocumentSnapshot().id).get();
-    relevantDocuments.forEach(async snap => snap.ref.delete());
 }

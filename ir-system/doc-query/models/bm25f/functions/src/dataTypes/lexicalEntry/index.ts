@@ -39,7 +39,7 @@ export async function addDocumentToLexiconEntry() {
     const seenLemmaOverview = Cache.getSeenLemmaOverview();
     for (const lemma in seenLemmaOverview) {
         if (seenLemmaOverview.hasOwnProperty(lemma) && seenLemmaOverview[lemma]) {
-            LexiconTransaction(
+            await LexiconTransaction(
                 getLexiconReference().doc(lemma),
                 addDocumentToLexiconEntryIfExists,
                 addDocumentToLexiconEntryIfNonExistent,
@@ -53,7 +53,7 @@ async function removeDocumentToBeDeletedFromAssociatedLexiconEntryIfExists(trans
     transaction.update(
         lexicalEntryRef,
         {
-            idfScore: computeIdfScore(lexicalEntryData.participatingDocCount - 1, collectionIndexEntryData.documentCount),
+            idfScore: computeIdfScore(lexicalEntryData.participatingDocCount - 1, collectionIndexEntryData.totalDocuments),
             participatingDocCount: lexicalEntryData.participatingDocCount - 1,
             participatingDocOverview: lexicalEntryData.participatingDocOverview,
         }
@@ -69,7 +69,7 @@ async function addDocumentToLexiconEntryIfExists(transaction: FirebaseFirestore.
     transaction.update(
         lexicalEntryRef,
         {
-            idfScore: computeIdfScore(lexicalEntryData.participatingDocCount + 1, collectionIndexEntryData.documentCount),
+            idfScore: computeIdfScore(lexicalEntryData.participatingDocCount + 1, collectionIndexEntryData.totalDocuments),
             participatingDocCount: lexicalEntryData.participatingDocCount + 1,
             participatingDocOverview: lexicalEntryData.participatingDocOverview,
         }
@@ -82,7 +82,7 @@ async function addDocumentToLexiconEntryIfNonExistent(transaction: FirebaseFires
     transaction.set(
         lexicalEntryRef,
         {
-            idfScore: computeIdfScore(0 + 1, collectionIndexEntryData.documentCount),
+            idfScore: computeIdfScore(0 + 1, collectionIndexEntryData.totalDocuments),
             participatingDocCount: 0 + 1,
             participatingDocOverview,
         }
