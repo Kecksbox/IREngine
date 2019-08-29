@@ -9,7 +9,7 @@ class Trigger {
     }
 
     public async call(snap: FirebaseFirestore.DocumentSnapshot, context: functions.EventContext) {
-        Cache.refresh(snap, context);
+        Cache.refreshBySnapAndContext(snap, context);
         await this.callBack();
     }
 

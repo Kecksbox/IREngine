@@ -1,9 +1,10 @@
 import * as functions from 'firebase-functions';
 
 import { getCollectionIndexEntryReference, PropertyWeightDictonary, isPropertyWeightDictonary } from "../collectionIndexEntry";
-import Cache from "../../dataStructures/cache";
-import { Token, SemanticParser } from "../../utilities/semanticParser";
-import { isObject, isNumber } from "util";
+import Cache from "../../../dataStructures/cache";
+import { Token, SemanticParser, isValidToken } from "../../../utilities/semanticParser";
+import { isObject, isNumber, isArray } from "util";
+import getDataFromReference from '../../../utilities/getDataFromReference';
 
 interface HitBinEntry extends Token {
     documentId: string,
@@ -14,8 +15,27 @@ export function isHitBinEntry(candidate: any): candidate is HitBinEntry {
     return true;
 }
 
+export function areHitBinEntrys(candidate: any): candidate is HitBinEntry[] {
+    if (!isArray(candidate)) {
+        return false;
+    }
+    for (const element of candidate) {
+        if (!isValidToken(element)) {
+            return false;
+        }
+    }
+    return true;
+}
+
 export function getHitBinReference(): FirebaseFirestore.CollectionReference {
     return getCollectionIndexEntryReference().collection('hitBin');
+}
+
+export async function getHitsByDocumentAndLemma(documentId: string, lemma: string) {
+    return (await getDataFromReference(
+        getHitBinReference().where('documentId', '==', documentId).where('lemma', '==', lemma),
+        areHitBinEntrys,
+    ) as HitBinEntry[]);
 }
 
 export async function countHits(propertyWeightDictonary: PropertyWeightDictonary) {
@@ -54,7 +74,6 @@ function countHitsInObjectRecursiv(obj: any, propertyWeightDictonary: PropertyWe
                 }
                 const propertyWeight = propertyWeightDictonary[key];
                 if (isNumber(propertyWeight)) {
-                    console.log('start counting:', value);
                     const countHitPromise = countHitsInText(value, propertyWeight, localDeepKey);
                     countHitPromises.push(countHitPromise);
                 } else {

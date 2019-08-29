@@ -1,9 +1,10 @@
 import * as functions from 'firebase-functions';
-import { db } from "../..";
+import { db } from "../../..";
 
-import Cache from "../../dataStructures/cache";
-import { isDocumentIndexEntry, getDocumentIndexEntryReference, DocumentIndexEntry } from "../documentIndexEntry";
+import Cache from "../../../dataStructures/cache";
+import { isDocumentIndexEntry, DocumentIndexEntry, getCachedDocumentIndexEntryReference } from "../documentIndexEntry";
 import { isString, isNumber, isObject } from 'util';
+import getDataFromReference from '../../../utilities/getDataFromReference';
 
 export interface PropertyWeightDictonary {
     [key: string]: PropertyWeightDictonary | number,
@@ -15,7 +16,7 @@ export function isPropertyWeightDictonary(candidate: any): candidate is Property
     }
     for (const key in candidate) {
         if (candidate.hasOwnProperty(key)) {
-            if (isPropertyWeightDictonary(candidate[key]) === false || isNumber(candidate[key]) === false) {
+            if (!(isPropertyWeightDictonary(candidate[key]) || isNumber(candidate[key]))) {
                 return false;
             }
         }
@@ -47,7 +48,11 @@ export function isCollectionIndexEntry(candidate: any): candidate is CollectionI
 }
 
 export function getCollectionIndexEntryReference(): FirebaseFirestore.DocumentReference {
-    return db.collection('collectionIndex').doc(Cache.getContext().params.collId);
+    return db.collection('collectionIndex').doc(Cache.getCollectionId());
+}
+
+export async function getCollectionIndexEntryData() {
+    return await getDataFromReference(getCollectionIndexEntryReference(), isCollectionIndexEntry) as CollectionIndexEntry;
 }
 
 export async function removeFromCollectionIndexEntry() {
@@ -56,20 +61,20 @@ export async function removeFromCollectionIndexEntry() {
     );
 }
 
-export function addDocumentToCollectionIndexOperation(transaction: FirebaseFirestore.Transaction, collectionIndexEntryData: CollectionIndexEntry, documentIndexEntryData: DocumentIndexEntry) {
+export function addDocumentToCollectionIndexOperation(transaction: FirebaseFirestore.Transaction, collectionIndexEntryData: CollectionIndexEntry) {
     transaction.update(
         getCollectionIndexEntryReference(),
         {
             totalDocuments: collectionIndexEntryData.totalDocuments + 1,
-            avgerageLength: ((collectionIndexEntryData.averageLength * collectionIndexEntryData.totalDocuments) + documentIndexEntryData.length) / (collectionIndexEntryData.totalDocuments + 1),
+            averageLength: ((collectionIndexEntryData.averageLength * collectionIndexEntryData.totalDocuments) + Cache.getDocumentLength()) / (collectionIndexEntryData.totalDocuments + 1),
             propertyWeightDictonary: collectionIndexEntryData.propertyWeightDictonary,
         }
     );
 }
 
-export async function CollectionIndexEntryTransaction(operation: (transaction: FirebaseFirestore.Transaction, collectionIndexEntryData: CollectionIndexEntry, documentIndexEntryData: DocumentIndexEntry) => void) {
-    await db.runTransaction(async transaction => {
-        return Promise.all([transaction.get(getCollectionIndexEntryReference()), transaction.get(getDocumentIndexEntryReference())]).then(docs => {
+export async function CollectionIndexEntryTransaction(operation: (transaction: FirebaseFirestore.Transaction, collectionIndexEntryData: CollectionIndexEntry, documentIndexEntryData: DocumentIndexEntry) => Promise<void>) {
+    await db.runTransaction(transaction => {
+        return Promise.all([transaction.get(getCollectionIndexEntryReference()), transaction.get(getCachedDocumentIndexEntryReference())]).then(async docs => {
             const collectionIndexEntry = docs[0];
             const documentIndexEntry = docs[1];
 
@@ -77,7 +82,7 @@ export async function CollectionIndexEntryTransaction(operation: (transaction: F
             if (isCollectionIndexEntry(collectionIndexEntryData)) {
                 const documentIndexEntryData = documentIndexEntry.data();
                 if (isDocumentIndexEntry(documentIndexEntryData)) {
-                    operation(transaction, collectionIndexEntryData, documentIndexEntryData);
+                    await operation(transaction, collectionIndexEntryData, documentIndexEntryData);
                 } else {
                     throw new functions.https.HttpsError('internal', '...');
                 }
@@ -88,12 +93,12 @@ export async function CollectionIndexEntryTransaction(operation: (transaction: F
     });
 }
 
-function removeFromCollectionIndexEntryOperation(transaction: FirebaseFirestore.Transaction, collectionIndexEntryData: CollectionIndexEntry, documentIndexEntryData: DocumentIndexEntry) {
+async function removeFromCollectionIndexEntryOperation(transaction: FirebaseFirestore.Transaction, collectionIndexEntryData: CollectionIndexEntry, documentIndexEntryData: DocumentIndexEntry) {
     transaction.update(
         getCollectionIndexEntryReference(),
         {
             totalDocuments: collectionIndexEntryData.totalDocuments - 1,
-            avgerageLength: ((collectionIndexEntryData.averageLength * collectionIndexEntryData.totalDocuments) - documentIndexEntryData.length) / (collectionIndexEntryData.totalDocuments - 1)
+            averageLength: ((collectionIndexEntryData.averageLength * collectionIndexEntryData.totalDocuments) - documentIndexEntryData.length) / (collectionIndexEntryData.totalDocuments - 1)
         }
     );
 }

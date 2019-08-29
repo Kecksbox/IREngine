@@ -1,8 +1,9 @@
 import * as functions from 'firebase-functions';
-import { db } from "../..";
+import { db } from "../../..";
 
 import { getCollectionIndexEntryReference, isCollectionIndexEntry, CollectionIndexEntry } from "../collectionIndexEntry";
-import Cache from "../../dataStructures/cache";
+import Cache from "../../../dataStructures/cache";
+import getDataFromReference from '../../../utilities/getDataFromReference';
 
 export interface SeenLemmaOverview {
     [key: string]: boolean
@@ -26,8 +27,14 @@ export function getLexiconReference(): FirebaseFirestore.CollectionReference {
     return getCollectionIndexEntryReference().collection('lexicon');
 }
 
+export function getLexiconEntryDataByLemma(lemma: string) {
+    return (getDataFromReference(getLexiconReference().doc(lemma), isLexicalEntry) as Promise<LexicalEntry>);
+}
+
 export async function removeDocumentToBeDeletedFromAllAssociatedLexiconEntries() {
-    const relevantDocuments = await getLexiconReference().where(`docsContainingLemma.${Cache.getTriggerDocumentSnapshot().id}`, '==', true).get();
+    console.log(Cache.getTriggerDocumentSnapshot().id);
+    const relevantDocuments = await getLexiconReference().where(`participatingDocOverview.${Cache.getTriggerDocumentSnapshot().id}`, '==', true).get();
+    console.log('we found entries:', relevantDocuments.docs.length);
     relevantDocuments.forEach(snap => LexiconTransaction(
         snap.ref,
         removeDocumentToBeDeletedFromAssociatedLexiconEntryIfExists,
@@ -65,7 +72,7 @@ function removeDocumentToBeDeletedFromAssociatedLexiconEntryIfNonExistent(transa
 }
 
 async function addDocumentToLexiconEntryIfExists(transaction: FirebaseFirestore.Transaction, lexicalEntryRef: FirebaseFirestore.DocumentReference, lexicalEntryData: LexicalEntry, collectionIndexEntryData: CollectionIndexEntry) {
-    lexicalEntryData.participatingDocOverview[Cache.getContext().params.docID] = true;
+    lexicalEntryData.participatingDocOverview[Cache.getDocumentId()] = true;
     transaction.update(
         lexicalEntryRef,
         {
@@ -78,7 +85,7 @@ async function addDocumentToLexiconEntryIfExists(transaction: FirebaseFirestore.
 
 async function addDocumentToLexiconEntryIfNonExistent(transaction: FirebaseFirestore.Transaction, lexicalEntryRef: FirebaseFirestore.DocumentReference, collectionIndexEntryData: CollectionIndexEntry) {
     const participatingDocOverview: ParticipatingDocOverview = {};
-    participatingDocOverview[Cache.getContext().params.docID] = true;
+    participatingDocOverview[Cache.getDocumentId()] = true;
     transaction.set(
         lexicalEntryRef,
         {
@@ -94,7 +101,7 @@ function computeIdfScore(documentsContainingLemma: number, totalDocuments: numbe
 }
 
 async function LexiconTransaction(lexicalEntryRef: FirebaseFirestore.DocumentReference, ifExists: (transaction: FirebaseFirestore.Transaction, lexicalEntryRef: FirebaseFirestore.DocumentReference, lexicalEntryData: LexicalEntry, collectionIndexEntryData: CollectionIndexEntry) => void, IfNonExistent: (transaction: FirebaseFirestore.Transaction, lexicalEntryRef: FirebaseFirestore.DocumentReference, collectionIndexEntryData: CollectionIndexEntry) => void) {
-    return db.runTransaction(async transaction => {
+    return db.runTransaction(transaction => {
         return Promise.all([transaction.get(lexicalEntryRef), transaction.get(getCollectionIndexEntryReference())]).then(docs => {
             const lexicalEntry = docs[0];
             const collectionIndexEntry = docs[1];

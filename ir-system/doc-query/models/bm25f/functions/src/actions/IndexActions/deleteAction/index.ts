@@ -1,7 +1,7 @@
-import { removeFromCollectionIndexEntry } from "../../dataTypes/collectionIndexEntry";
-import { deleteDocumentIndexEntry } from '../../dataTypes/documentIndexEntry';
-import { removeDocumentToBeDeletedFromAllAssociatedLexiconEntries } from '../../dataTypes/lexicalEntry';
-import { removeAllHitsAssociatedWithTheDocumentToBeDeleted } from '../../dataTypes/hitBinEntry';
+import { removeFromCollectionIndexEntry } from "../../../dataTypes/documentTypes/collectionIndexEntry";
+import { deleteDocumentIndexEntry } from '../../../dataTypes/documentTypes/documentIndexEntry';
+import { removeDocumentToBeDeletedFromAllAssociatedLexiconEntries } from '../../../dataTypes/documentTypes/lexicalEntry';
+import { removeAllHitsAssociatedWithTheDocumentToBeDeleted } from '../../../dataTypes/documentTypes/hitBinEntry';
 
 /*
 

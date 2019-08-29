@@ -1,12 +1,17 @@
 import * as functions from 'firebase-functions';
-import { PropertyWeightDictonary } from '../../dataTypes/collectionIndexEntry';
-import { SeenLemmaOverview } from '../../dataTypes/lexicalEntry';
+
+import { PropertyWeightDictonary } from '../../dataTypes/documentTypes/collectionIndexEntry';
+import { SeenLemmaOverview } from '../../dataTypes/documentTypes/lexicalEntry';
 
 class Cache {
 
     private static instance: Cache;
 
-    public static getContext(): functions.EventContext {
+    public static getCollectionId(): string {
+        return this.loadProperty('collectionId');
+    }
+
+    public static getDocumentId(): string {
         return this.loadProperty('context');
     }
 
@@ -31,10 +36,17 @@ class Cache {
         return this.saveLoadProperty('documentLength', 0);
     }
 
-    public static refresh(snap: FirebaseFirestore.DocumentSnapshot, context: functions.EventContext) {
+    public static refreshByCollectionId(collectionId: string) {
         const clearInstance = this.clear();
-        clearInstance.assignOnceToProperty('context', context);
+        clearInstance.assignOnceToProperty('collectionId', collectionId);
+        return clearInstance;
+    }
+
+    public static refreshBySnapAndContext(snap: FirebaseFirestore.DocumentSnapshot, context: functions.EventContext) {
+        const clearInstance = this.refreshByCollectionId(context.params.collId);
+        clearInstance.assignOnceToProperty('documentId', context.params.docId);
         clearInstance.assignOnceToProperty('triggerDocumentSnapshot', snap);
+        return clearInstance;
     }
 
     private static clear() {
@@ -44,7 +56,7 @@ class Cache {
 
     private static loadProperty(propertyName: string) {
         const instance = this.getInstance();
-        if (!(instance as any)[propertyName]) {
+        if (!instance.hasOwnProperty(propertyName)) {
             throw new functions.https.HttpsError('internal', `The property ${propertyName} you want to load has not yet been defined.`);
         }
         return (instance as any)[propertyName];
@@ -52,7 +64,7 @@ class Cache {
 
     public static saveLoadProperty(propertyName: string, defaultValue: any) {
         const instance = this.getInstance();
-        if (!(instance as any)[propertyName]) {
+        if (!instance.hasOwnProperty(propertyName)) {
             (instance as any)[propertyName] = defaultValue;
         }
         return this.loadProperty(propertyName);
@@ -65,7 +77,7 @@ class Cache {
         return this.instance;
     }
 
-    private assignOnceToProperty(propertyName: string, element: any) {
+    public assignOnceToProperty(propertyName: string, element: any) {
         if ((this as any)[propertyName] !== undefined) {
             throw new functions.https.HttpsError('internal', 'An attempt is made to change a uniquely assignable property. This is unwanted behavior.');
         }

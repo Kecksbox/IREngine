@@ -1,7 +1,7 @@
-import { addDocumentToLexiconEntry } from "../../dataTypes/lexicalEntry";
-import { countHits } from "../../dataTypes/hitBinEntry";
-import { addDocumentToDocumentIndex, DocumentIndexEntry } from "../../dataTypes/documentIndexEntry";
-import { CollectionIndexEntry, CollectionIndexEntryTransaction, addDocumentToCollectionIndexOperation } from "../../dataTypes/collectionIndexEntry";
+import { addDocumentToLexiconEntry } from "../../../dataTypes/documentTypes/lexicalEntry";
+import { countHits } from "../../../dataTypes/documentTypes/hitBinEntry";
+import { addDocumentToDocumentIndex, DocumentIndexEntry } from "../../../dataTypes/documentTypes/documentIndexEntry";
+import { CollectionIndexEntry, CollectionIndexEntryTransaction, addDocumentToCollectionIndexOperation } from "../../../dataTypes/documentTypes/collectionIndexEntry";
 
 /*
 
@@ -21,8 +21,8 @@ export default async () => {
     await CollectionIndexEntryTransaction(
         async (transaction: FirebaseFirestore.Transaction, collectionIndexEntryData: CollectionIndexEntry, documentIndexEntryData: DocumentIndexEntry) => {
             await countHits(collectionIndexEntryData.propertyWeightDictonary);
-            await addDocumentToDocumentIndex();
-            addDocumentToCollectionIndexOperation(transaction, collectionIndexEntryData, documentIndexEntryData);
+            addDocumentToDocumentIndex(transaction);
+            addDocumentToCollectionIndexOperation(transaction, collectionIndexEntryData);
         }
     );
     await addDocumentToLexiconEntry();
